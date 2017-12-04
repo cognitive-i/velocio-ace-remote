@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import sys
 import time
 import serial
@@ -16,7 +17,6 @@ def print_help():
 	print "********************************************************************************"
 	print "*                                                                              *"
 	print "*                             velocio_ace_remote.py                            *"
-	print "*                                 version 1.0.1                                *"  
 	print "*                                                                              *"
 	print "********************************************************************************"
 	print ""
@@ -68,7 +68,7 @@ def print_help():
 # @param printstring     : runtime message for the user
 def send_instruction(instruction_set, printstring):
 	# clear out any leftover data
-	if ser.inWaiting() > 0: 
+	if ser.inWaiting() > 0:
 		ser.flushInput()
 
 	print "[*] sending %s instruction ..." % printstring
@@ -85,7 +85,7 @@ def send_instruction(instruction_set, printstring):
 			while ser.inWaiting() > 0:
 				response += "\\x%s" % ser.read().encode('hex')
 			time.sleep(0.1)
-			
+
 			response = response.replace("\\x", "").strip()
 			ascii_response = ""
 			for letter in response.decode('hex'):
@@ -96,7 +96,7 @@ def send_instruction(instruction_set, printstring):
 					ascii_response += "_"
 			output_header = "\\x%s:\t" % cur_reg
 			output_footer = "\t%s" % ascii_response
-			
+
 			print "%s%s%s" % (output_header, response, output_footer)
 		else:
 			print "[*] instruction sent"
@@ -104,19 +104,19 @@ def send_instruction(instruction_set, printstring):
 
 def main():
 	# handle input errors
-	if len(sys.argv) != 2: 
+	if len(sys.argv) != 2:
 		print_help()
 
 	# get cmd line arg
 	param = sys.argv[1]
 
 	# check for help request
-	if param == "-h" or param == "--help": 
+	if param == "-h" or param == "--help":
 		print_help()
 
 	# initiate the connection
 	ser.isOpen()
-	
+
 
 	###
 	# process the instruction
@@ -216,4 +216,3 @@ if __name__ == "__main__":
 		print "[!] MSG: %s" % e
 		print ""
 		exit(1)
-
