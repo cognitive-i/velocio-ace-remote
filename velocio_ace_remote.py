@@ -98,9 +98,53 @@ def send_instruction(instruction_set, printstring):
 			output_footer = "\t%s" % ascii_response
 
 			print "%s%s%s" % (output_header, response, output_footer)
+		elif "enumerate_tags" in printstring:
+			process_enumerate_tags_response(ser)
 		else:
 			print "[*] instruction sent"
 
+def read_response(serialPort):
+	response = []
+	while serialPort.inWaiting() > 0:
+		response.append(ord(serialPort.read()))
+
+	return response
+
+def toString(byteArray):
+	return ''.join(map(lambda x: chr(x), byteArray))
+
+def decode_tag_response(response):
+	assert (5 <= len(response)), "Incomplete response packet"
+	assert ([0x56, 0xff, 0xff, 0x00] == response[0:4]), "Packet preamble missing"
+	assert (response[4] == len(response)), "Packet length mismatch"
+
+	tagNumber = response[8]
+	tagName = toString(response[9:25])
+	return (tagNumber, tagName)
+
+def request_tag(serialPort, tagNumber):
+	assert ((tagNumber > 0) and (tagNumber < 256)), "tagNumber is a 1 index, byte representation"
+	request = [0x56, 0xFF, 0xFF, 0x00, 0x08, 0x0A, 0x00, tagNumber]
+	serialPort.flushInput()
+	serialPort.write(toString(request))
+	time.sleep(0.1)
+
+def process_enumerate_tags_response(serialPort):
+	# change in style from rest of code to process serial using bytes
+	response = read_response(serialPort)
+	# sanity check response
+	assert (5 <= len(response)), "Incomplete response packet"
+	assert ([0x56, 0xff, 0xff, 0x00] == response[0:4]), "Packet preamble missing"
+	assert (response[4] == len(response)), "Packet length mismatch"
+
+	# last byte is the number of tags (TODO determine if multi byte and endian)
+	tagCount = response[-1];
+	print '%d' % tagCount
+
+	for tagNumber in range(1, tagCount):
+		request_tag(serialPort, tagNumber)
+		response = read_response(serialPort)
+		print decode_tag_response(response)
 
 def main():
 	# handle input errors
@@ -116,7 +160,6 @@ def main():
 
 	# initiate the connection
 	ser.isOpen()
-
 
 	###
 	# process the instruction
@@ -148,6 +191,8 @@ def main():
 	elif param == "read_input_bits": send_instruction(read_input_bits, param)
 	elif param == "read_output_bits": send_instruction(read_output_bits, param)
 
+	# enumerate tags
+	elif param == "enumerate_tags": send_instruction(enumerate_tags_command, param)
 	# edge cases
 	else: print_help()
 
@@ -204,6 +249,9 @@ if __name__ == "__main__":
 	"\x56\xff\xff\x00\x08\x0a\x00\x0c"
 	]
 
+	# this command receive a response informing number of enumerate_tags
+	# and then we need to query tag by tag
+	enumerate_tags_command = ["\x56\xFF\xFF\x00\x06\xAC"]
 
 	try:
 		print ""
