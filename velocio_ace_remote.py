@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+import argparse
+import serial
 import sys
 import time
-import serial
 
 # define serial connection
 ser = serial.Serial(
@@ -11,57 +12,6 @@ ser = serial.Serial(
 	stopbits=serial.STOPBITS_ONE,
 	bytesize=serial.EIGHTBITS
 )
-
-def print_help():
-	print ""
-	print "********************************************************************************"
-	print "*                                                                              *"
-	print "*                             velocio_ace_remote.py                            *"
-	print "*                                                                              *"
-	print "********************************************************************************"
-	print ""
-	print " Usage: python velocio_ace_remote.py [instruction]"
-	print ""
-	print " Control Instructions:"
-	print " \tplay \t\t\tstart the routine at current position"
-	print " \tpause\t\t\tpause the routine at current position"
-	print " \treset\t\t\treset the routine to the beginning"
-	print " \tset_output_1_off\tset output 1 to off"
-	print " \tset_output_2_off\tset output 2 to off"
-	print " \tset_output_3_off\tset output 3 to off"
-	print " \tset_output_4_off\tset output 4 to off"
-	print " \tset_output_5_off\tset output 5 to off"
-	print " \tset_output_6_off\tset output 6 to off"
-	print " \tset_output_1_on\t\tset output 1 to on"
-	print " \tset_output_2_on\t\tset output 2 to on"
-	print " \tset_output_3_on\t\tset output 3 to on"
-	print " \tset_output_4_on\t\tset output 4 to on"
-	print " \tset_output_5_on\t\tset output 5 to on"
-	print " \tset_output_6_on\t\tset output 6 to on"
-	print ""
-	print ""
-	print " Read Instructions:"
-	print ""
-	print " \tread_input_bits\t\tquery the input bits and print the response"
-	print " \tread_output_bits\tquery the output bits and print the response"
-	print ""
-	print ""
-	print " Debug Instructions:"
-	print ""
-	print " \tenter_debug\t\tput the device into debug mode for testing"
-	print " \texit_debug\t\texit the device debug mode for normal operation"
-	print " \tstep_into\t\tstandard procedure"
-	print " \tstep_out\t\tstandard procedure"
-	print " \tstep_over\t\tstandard procedure"
-	print ""
-	print ""
-	print " Example:\tpython velocio_ace_remote.py play"
-	print " Example:\tpython velocio_ace_remote.py read_output_bits"
-	print " Example:\tpython velocio_ace_remote.py exit_debug"
-	print ""
-	print ""
-	exit(1)
-
 
 # sends a set of instructions to the connected device
 # @param instruction_set : an array of commands to send to the PLC in hex
@@ -139,99 +89,37 @@ def process_enumerate_tags_response(serialPort):
 
 	# last byte is the number of tags (TODO determine if multi byte and endian)
 	tagCount = response[-1];
-	print '%d' % tagCount
 
 	for tagNumber in range(1, tagCount):
 		request_tag(serialPort, tagNumber)
 		response = read_response(serialPort)
 		print decode_tag_response(response)
 
-def main():
-	# handle input errors
-	if len(sys.argv) != 2:
-		print_help()
 
-	# get cmd line arg
-	param = sys.argv[1]
+commands = {}
+commands['press_play'] = ["\x56\xff\xff\x00\x07\xf1\x01"]
+commands['press_pause'] =      ["\x56\xff\xff\x00\x07\xf1\x02"]
+commands['press_reset'] =      ["\x56\xff\xff\x00\x07\xf1\x06"]
+commands['step_into'] =        ["\x56\xff\xff\x00\x07\xf1\x03"]
+commands['step_out'] =         ["\x56\xff\xff\x00\x07\xf1\x04"]
+commands['step_over'] =        ["\x56\xff\xff\x00\x07\xf1\x05"]
+commands['enter_debug'] =      ["\x56\xff\xff\x00\x07\xf0\x02"]
+commands['exit_debug'] =       ["\x56\xff\xff\x00\x07\xf0\x01"]
+commands['set_output_1_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x01\x00\x00\x00"]
+commands['set_output_2_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x02\x00\x00\x00"]
+commands['set_output_3_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x04\x00\x00\x00"]
+commands['set_output_4_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x08\x00\x00\x00"]
+commands['set_output_5_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x10\x00\x00\x00"]
+commands['set_output_6_off'] = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x20\x00\x00\x00"]
+commands['set_output_1_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x01\x00\x00\x01"]
+commands['set_output_2_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x02\x00\x00\x01"]
+commands['set_output_3_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x04\x00\x00\x01"]
+commands['set_output_4_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x08\x00\x00\x01"]
+commands['set_output_5_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x10\x00\x00\x01"]
+commands['set_output_6_on'] =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x20\x00\x00\x01"]
 
-	# check for help request
-	if param == "-h" or param == "--help":
-		print_help()
-
-	# initiate the connection
-	ser.isOpen()
-
-	###
-	# process the instruction
-	###
-
-	# control
-	if param == "play": send_instruction(press_play, param)
-	elif param == "pause": send_instruction(press_pause, param)
-	elif param == "reset": send_instruction(press_reset, param)
-	elif param == "step_into": send_instruction(step_into, param)
-	elif param == "step_out": send_instruction(step_out, param)
-	elif param == "step_over": send_instruction(step_over, param)
-	elif param == "enter_debug": send_instruction(enter_debug, param)
-	elif param == "exit_debug": send_instruction(exit_debug, param)
-	elif param == "set_output_1_off": send_instruction(set_output_1_off, param)
-	elif param == "set_output_1_on": send_instruction(set_output_1_on, param)
-	elif param == "set_output_2_off": send_instruction(set_output_2_off, param)
-	elif param == "set_output_2_on": send_instruction(set_output_2_on, param)
-	elif param == "set_output_3_off": send_instruction(set_output_3_off, param)
-	elif param == "set_output_3_on": send_instruction(set_output_3_on, param)
-	elif param == "set_output_4_off": send_instruction(set_output_4_off, param)
-	elif param == "set_output_4_on": send_instruction(set_output_4_on, param)
-	elif param == "set_output_5_off": send_instruction(set_output_5_off, param)
-	elif param == "set_output_5_on": send_instruction(set_output_5_on, param)
-	elif param == "set_output_6_off": send_instruction(set_output_6_off, param)
-	elif param == "set_output_6_on": send_instruction(set_output_6_on, param)
-
-	# read
-	elif param == "read_input_bits": send_instruction(read_input_bits, param)
-	elif param == "read_output_bits": send_instruction(read_output_bits, param)
-
-	# enumerate tags
-	elif param == "enumerate_tags": send_instruction(enumerate_tags_command, param)
-	# edge cases
-	else: print_help()
-
-	# clean up
-	ser.close()
-
-
-
-if __name__ == "__main__":
-
-	###
-	# define the instructions
-	###
-
-	# control instructions
-	press_play =       ["\x56\xff\xff\x00\x07\xf1\x01"]
-	press_pause =      ["\x56\xff\xff\x00\x07\xf1\x02"]
-	press_reset =      ["\x56\xff\xff\x00\x07\xf1\x06"]
-	step_into =        ["\x56\xff\xff\x00\x07\xf1\x03"]
-	step_out =         ["\x56\xff\xff\x00\x07\xf1\x04"]
-	step_over =        ["\x56\xff\xff\x00\x07\xf1\x05"]
-	enter_debug =      ["\x56\xff\xff\x00\x07\xf0\x02"]
-	exit_debug =       ["\x56\xff\xff\x00\x07\xf0\x01"]
-	set_output_1_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x01\x00\x00\x00"]
-	set_output_2_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x02\x00\x00\x00"]
-	set_output_3_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x04\x00\x00\x00"]
-	set_output_4_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x08\x00\x00\x00"]
-	set_output_5_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x10\x00\x00\x00"]
-	set_output_6_off = ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x20\x00\x00\x00"]
-	set_output_1_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x01\x00\x00\x01"]
-	set_output_2_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x02\x00\x00\x01"]
-	set_output_3_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x04\x00\x00\x01"]
-	set_output_4_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x08\x00\x00\x01"]
-	set_output_5_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x10\x00\x00\x01"]
-	set_output_6_on =  ["\x56\xff\xff\x00\x15\x11\x01\x00\x01\x00\x00\x09\x01\x00\x00\x01\x00\x20\x00\x00\x01"]
-
-
-	# read instructions
-	read_input_bits = [
+# read instructions
+commands['read_input_bits'] = [
 	"\x56\xff\xff\x00\x08\x0a\x00\x01",
 	"\x56\xff\xff\x00\x08\x0a\x00\x02",
 	"\x56\xff\xff\x00\x08\x0a\x00\x03",
@@ -240,7 +128,7 @@ if __name__ == "__main__":
 	"\x56\xff\xff\x00\x08\x0a\x00\x06"
 	]
 
-	read_output_bits = [
+commands['read_output_bits'] = [
 	"\x56\xff\xff\x00\x08\x0a\x00\x07",
 	"\x56\xff\xff\x00\x08\x0a\x00\x08",
 	"\x56\xff\xff\x00\x08\x0a\x00\x09",
@@ -249,18 +137,31 @@ if __name__ == "__main__":
 	"\x56\xff\xff\x00\x08\x0a\x00\x0c"
 	]
 
-	# this command receive a response informing number of enumerate_tags
-	# and then we need to query tag by tag
-	enumerate_tags_command = ["\x56\xFF\xFF\x00\x06\xAC"]
+# this command receive a response informing number of enumerate_tags
+# and then we need to query tag by tag
+commands['enumerate_tags'] = ["\x56\xFF\xFF\x00\x06\xAC"]
 
-	try:
-		print ""
-		main()
-		print ""
+def validateCommandFactory(commandList):
+	def validateCommand(command):
+		if (command in commandList):
+			return command
+		else:
+			raise Exception('Unsupported command: ' + command)
 
-	except Exception as e:
-		print ""
-		print "[!] ERROR"
-		print "[!] MSG: %s" % e
-		print ""
-		exit(1)
+	return validateCommand
+
+def main():
+	parser = argparse.ArgumentParser(description="Tool for interacting with Velocio Ace PLC")
+	parser.add_argument("command", type=validateCommandFactory(commands), help="Command can be one of the following: " + str(commands.keys()))
+	args = parser.parse_args()
+	# initiate the connection
+	ser.isOpen()
+	send_instruction(commands[args.command], args.command)
+	ser.close()
+
+try:
+	main()
+except Exception as e:
+	print "[!] ERROR"
+	print "[!] MSG: %s" % e
+	exit(1)
