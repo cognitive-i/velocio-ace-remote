@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import argcomplete
 import serial
 import sys
 import time
@@ -21,7 +22,7 @@ def send_instruction(instruction_set, printstring):
 	if ser.inWaiting() > 0:
 		ser.flushInput()
 
-	print "[*] sending %s instruction ..." % printstring
+	#print "[*] sending %s instruction ..." % printstring
 
     # perform the write
 	for instruction in instruction_set:
@@ -67,10 +68,16 @@ def decode_tag_response(response):
 	assert (5 <= len(response)), "Incomplete response packet"
 	assert ([0x56, 0xff, 0xff, 0x00] == response[0:4]), "Packet preamble missing"
 	assert (response[4] == len(response)), "Packet length mismatch"
+	assert (37 == len(response)), "Unexpected Packet length"
 
 	tagNumber = response[8]
-	tagName = toString(response[9:25])
-	return (tagNumber, tagName)
+	tagName = toString(response[9:25]).strip()
+	tagBank = response[29] # not sure about this one
+	tagBit = response[30]
+
+	# print tagName
+	# print response
+	return (tagNumber, tagName, tagBank, tagBit)
 
 def request_tag(serialPort, tagNumber):
 	assert ((tagNumber > 0) and (tagNumber < 256)), "tagNumber is a 1 index, byte representation"
@@ -79,7 +86,11 @@ def request_tag(serialPort, tagNumber):
 	serialPort.write(toString(request))
 	time.sleep(0.1)
 
+
+tagNames = []
 def process_enumerate_tags_response(serialPort):
+	global tagNames
+
 	# change in style from rest of code to process serial using bytes
 	response = read_response(serialPort)
 	# sanity check response
@@ -93,7 +104,8 @@ def process_enumerate_tags_response(serialPort):
 	for tagNumber in range(1, tagCount):
 		request_tag(serialPort, tagNumber)
 		response = read_response(serialPort)
-		print decode_tag_response(response)
+		tagTuple = decode_tag_response(response)
+		tagNames.append(tagTuple[1])
 
 
 commands = {}
@@ -151,17 +163,43 @@ def validateCommandFactory(commandList):
 	return validateCommand
 
 def main():
+	global tagNames
+
+	try:
+		tagNames = []
+		with open('/tmp/tagcache.txt', 'r') as f:
+			tagNames = map(lambda x: x.strip(), f.readlines())
+			f.close()
+	except:
+		pass
+
 	parser = argparse.ArgumentParser(description="Tool for interacting with Velocio Ace PLC")
-	parser.add_argument("command", type=validateCommandFactory(commands), help="Command can be one of the following: " + str(commands.keys()))
+	parser.add_argument("--command", type=validateCommandFactory(commands), choices=commands.keys(), help="Send command can be one of the following")
+	parser.add_argument("--readtag", help="Read a named tag", choices=tagNames)
+	parser.add_argument("--listtags", help="List (and cache) tags", action="store_true")
+
+	argcomplete.autocomplete(parser)
 	args = parser.parse_args()
 	# initiate the connection
 	ser.isOpen()
-	send_instruction(commands[args.command], args.command)
+
+	if (args.listtags):
+		# this is a hack to setup the tag list
+		tagNames = []
+		send_instruction(commands['enumerate_tags'], 'enumerate_tags')
+		with open('/tmp/tagcache.txt', 'w') as f:
+			f.writelines(map(lambda x: x + "\n", tagNames))
+			f.close()
+	elif (args.readtag):
+		print "To implement readtag", args.readtag
+	elif (args.command):
+		send_instruction(commands[args.command], args.command)
 	ser.close()
 
-try:
-	main()
-except Exception as e:
-	print "[!] ERROR"
-	print "[!] MSG: %s" % e
-	exit(1)
+main()
+
+# try:
+# except Exception as e:
+# 	print "[!] ERROR"
+# 	print "[!] MSG: %s" % e
+# 	exit(1)
